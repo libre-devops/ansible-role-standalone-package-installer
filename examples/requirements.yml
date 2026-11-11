@@ -1,0 +1,12 @@
+---
+# Install the role straight from GitHub, pinned to a release tag:
+#   ansible-galaxy install -r requirements.yml
+roles:
+  - name: libre_devops.standalone_package_installer
+    src: https://github.com/libre-devops/ansible-role-standalone-package-installer.git
+    scm: git
+    version: 1.0.0
+
+# Needed on SUSE hosts only, where packages install with community.general.zypper.
+collections:
+  - name: community.general

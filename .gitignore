@@ -1,0 +1,20 @@
+# Python and tooling
+.venv/
+__pycache__/
+.cache/
+.ansible/
+*.retry
+
+# Editors
+.idea/
+.vscode/
+
+# Never commit private keys, inventories or vault passwords. molecule/fixtures holds public
+# test keys only.
+id_*
+!molecule/fixtures/*.pub
+*.pem
+*.key
+inventory.ini
+/inventory.yml
+.vault_pass*

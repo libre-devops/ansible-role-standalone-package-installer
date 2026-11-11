@@ -1,0 +1,8 @@
+---
+# Collections for development and tests. Users of the role need community.general on SUSE hosts
+# only, where it installs with community.general.zypper.
+collections:
+  - name: community.general
+    version: ">=10.0.0,<12.0.0"
+  - name: containers.podman
+    version: ">=1.16.0,<2.0.0"

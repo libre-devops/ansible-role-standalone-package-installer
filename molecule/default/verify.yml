@@ -1,0 +1,23 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run jq
+      ansible.builtin.command:
+        argv: [jq, --null-input, --compact-output, "{installed: true}"]
+      register: __verify_jq
+      changed_when: false
+
+    - name: Look for the files on the host
+      ansible.builtin.stat:
+        path: /var/tmp/standalone-package-installer
+      register: __verify_dir
+
+    - name: Check jq works and the files are gone
+      ansible.builtin.assert:
+        that:
+          - __verify_jq.stdout == '{"installed":true}'
+          - not __verify_dir.stat.exists
+        quiet: true

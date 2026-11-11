@@ -1,0 +1,20 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    __converge_dir: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/{{ inventory_hostname }}"
+    __converge_debs: "{{ query('ansible.builtin.fileglob', __converge_dir ~ '/pkgs/*.deb') }}"
+    standalone_package_installer_files:
+      - "{{ __converge_dir }}/pkgs/*"
+    standalone_package_installer_use_repos: false
+    # The distribution's own release key, as Microsoft's would be for its agents. Not every file in
+    # /etc/pki/rpm-gpg: RHEL 9's post-quantum key is one this rpm cannot import.
+    standalone_package_installer_gpg_keys: >-
+      {{ query('ansible.builtin.fileglob', __converge_dir ~ '/keys/RPM-GPG-KEY-*')
+         | select('search', '/RPM-GPG-KEY-(redhat-release|Rocky-[0-9]+)$') | list }}
+    # DEB files carry no signature, so they are checked against checksums taken when they came in.
+    standalone_package_installer_checksums: "{{ lookup('ansible.builtin.file', __converge_dir ~ '/checksums.json') | from_json }}"
+    standalone_package_installer_require_checksums: "{{ __converge_debs | length > 0 }}"
+  roles:
+    - role: libre_devops.standalone_package_installer

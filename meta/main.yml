@@ -1,0 +1,36 @@
+---
+galaxy_info:
+  namespace: libre_devops
+  role_name: standalone_package_installer
+  author: Craig Thacker
+  company: Libre DevOps
+  description: >-
+    Push RPM or DEB files from the control node and install them with the host's package
+    manager, checking signatures and checksums: a quick way to debug, test or do a one-off
+  license: MIT
+  min_ansible_version: "2.16"
+  issue_tracker_url: https://github.com/libre-devops/ansible-role-standalone-package-installer/issues
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: Ubuntu
+      versions:
+        - noble
+    - name: SLES
+      versions:
+        - "15"
+  galaxy_tags:
+    - packages
+    - rpm
+    - deb
+    - offline
+    - airgap
+
+dependencies: []

@@ -1,0 +1,4 @@
+---
+- name: Install the package files
+  ansible.builtin.include_tasks: install.yml
+  when: standalone_package_installer_files | length > 0

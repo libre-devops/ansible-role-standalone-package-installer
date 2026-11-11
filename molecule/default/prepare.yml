@@ -1,0 +1,59 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    __prepare_dir: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}"
+  tasks:
+    - name: Download jq and what it needs, without installing them  # noqa: command-instead-of-module
+      ansible.builtin.shell: |
+        set -e
+        rm -rf /tmp/spi-pkgs && mkdir -p /tmp/spi-pkgs
+        case "{{ ansible_facts['os_family'] }}" in
+          RedHat) dnf install -y --downloadonly --downloaddir=/tmp/spi-pkgs jq ;;
+          Debian) apt-get update && apt-get install -y --download-only --no-install-recommends jq \
+                    && cp /var/cache/apt/archives/*.deb /tmp/spi-pkgs/ && apt-get clean ;;
+          # A glob, not find: the SLES 16 image has no findutils.
+          Suse) zypper --non-interactive --pkg-cache-dir /tmp/spi-cache install --download-only jq
+                cp /tmp/spi-cache/*/*/*.rpm /tmp/spi-pkgs/ && rm -rf /tmp/spi-cache ;;
+        esac
+        ls /tmp/spi-pkgs/* >/dev/null
+        ls /tmp/spi-pkgs
+      args:
+        executable: /bin/bash
+      register: __prepare_download
+      changed_when: true
+
+    - name: Check jq is not installed yet
+      ansible.builtin.command: jq --version
+      register: __prepare_jq
+      changed_when: false
+      failed_when: __prepare_jq.rc == 0
+
+    - name: Copy the packages and signing keys to the control node
+      delegate_to: localhost
+      become: false
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      ansible.builtin.shell: |
+        set -e
+        rm -rf "{{ __prepare_dir }}/{{ inventory_hostname }}"
+        mkdir -p "{{ __prepare_dir }}/{{ inventory_hostname }}/keys"
+        podman cp "{{ inventory_hostname }}:/tmp/spi-pkgs" "{{ __prepare_dir }}/{{ inventory_hostname }}/pkgs"
+        if podman exec "{{ inventory_hostname }}" test -d /etc/pki/rpm-gpg; then
+          podman cp "{{ inventory_hostname }}:/etc/pki/rpm-gpg/." "{{ __prepare_dir }}/{{ inventory_hostname }}/keys/"
+        fi
+        # Checksums as they came in, for the DEB files, which carry no signature.
+        cd "{{ __prepare_dir }}/{{ inventory_hostname }}/pkgs"
+        {{ ansible_playbook_python }} -c 'import hashlib, json, pathlib
+        files = sorted(pathlib.Path(".").glob("*.deb"))
+        print(json.dumps({f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in files}))' > ../checksums.json
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Remove them from the host
+      ansible.builtin.file:
+        path: /tmp/spi-pkgs
+        state: absent

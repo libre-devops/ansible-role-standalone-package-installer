@@ -1,0 +1,62 @@
+---
+# Shared by every scenario under molecule/. Each image gets the Python the role needs, as a
+# managed host would have (libre_devops.python gives one to hosts without). Pick one with:
+# just test default rhel9 (the justfile adds the spi- prefix, which keeps these containers apart
+# from other roles' tests)
+driver:
+  name: podman
+
+platforms:
+  - name: spi-rhel8
+    image: registry.access.redhat.com/ubi8/ubi:latest
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-rhel9
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-rocky10
+    image: docker.io/rockylinux/rockylinux:10-ubi
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-debian12
+    image: docker.io/library/debian:12
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-debian13
+    image: docker.io/library/debian:13
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-ubuntu2404
+    image: docker.io/library/ubuntu:24.04
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-ubuntu2604
+    image: docker.io/library/ubuntu:26.04
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-sles15
+    image: registry.suse.com/bci/bci-base:15.7
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+  - name: spi-sles16
+    image: registry.suse.com/bci/bci-base:16.0
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      callback_result_format: yaml
+      interpreter_python: auto_silent
+  inventory:
+    host_vars:
+      # RHEL 8 and SLES 15 ship Python 3.6, which ansible-core no longer supports on targets.
+      spi-rhel8:
+        ansible_python_interpreter: /usr/bin/python3.12
+      spi-sles15:
+        ansible_python_interpreter: /usr/bin/python3.11
+
+verifier:
+  name: ansible

@@ -1,0 +1,51 @@
+---
+argument_specs:
+  main:
+    short_description: Push RPM or DEB files from the control node and install them
+    description:
+      - Pushes package files from the control node to each host and installs them with the host's
+        own package manager (dnf, zypper, apt-get or dpkg), for debugging, testing or a one-off.
+      - Checks RPM signatures against the host's RPM database, after importing keys from the control
+        node, and SHA-256 checksums on the control node before anything is pushed.
+      - Pushes nothing when every package is already installed at the version its file name gives.
+    author:
+      - Craig Thacker
+    options:
+      standalone_package_installer_files:
+        description: Package files on the control node, as paths or globs. RPMs for Red Hat and SUSE, DEBs for Debian.
+        type: list
+        elements: str
+        default: []
+      standalone_package_installer_use_repos:
+        description: Let the package manager fetch missing dependencies from the host's repositories.
+        type: bool
+        default: true
+      standalone_package_installer_verify_signatures:
+        description: Check RPM signatures against the keys in the host's RPM database.
+        type: bool
+        default: true
+      standalone_package_installer_gpg_keys:
+        description: Key files on the control node to import into the host's RPM database first.
+        type: list
+        elements: str
+        default: []
+      standalone_package_installer_checksums:
+        description: SHA-256 checksums by file name, checked on the control node before anything is pushed.
+        type: dict
+        default: {}
+      standalone_package_installer_require_checksums:
+        description: Refuse any file without an entry in standalone_package_installer_checksums.
+        type: bool
+        default: false
+      standalone_package_installer_allow_downgrade:
+        description: Allow a file to replace a newer installed version.
+        type: bool
+        default: false
+      standalone_package_installer_remote_dir:
+        description: Where the files wait on the host while they are installed.
+        type: path
+        default: /var/tmp/standalone-package-installer
+      standalone_package_installer_cleanup:
+        description: Delete the files from the host afterwards.
+        type: bool
+        default: true

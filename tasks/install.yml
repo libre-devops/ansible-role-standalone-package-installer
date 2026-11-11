@@ -1,0 +1,243 @@
+---
+- name: Gather the facts the role needs
+  ansible.builtin.setup:
+    gather_subset:
+      - "!all"
+      - "!min"
+      - distribution
+      - pkg_mgr
+  when: ansible_facts['os_family'] is not defined or ansible_facts['pkg_mgr'] is not defined
+
+- name: Check the role can install packages here
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in __standalone_package_installer_types
+    fail_msg: >-
+      {{ inventory_hostname }} is {{ ansible_facts['os_family'] }}. The role installs RPMs on the Red Hat and
+      SUSE families and DEBs on the Debian family.
+    quiet: true
+
+- name: Check each file or pattern matches a file on the control node
+  ansible.builtin.assert:
+    that:
+      - query('ansible.builtin.fileglob', item | expanduser) | length > 0
+    fail_msg: "{{ item }} matches no file on the control node."
+    quiet: true
+  loop: "{{ standalone_package_installer_files }}"
+
+- name: List the package files
+  ansible.builtin.set_fact:
+    __standalone_package_installer_expected: []
+    __standalone_package_installer_missing: []
+    __standalone_package_installer_type: "{{ __standalone_package_installer_types[ansible_facts['os_family']] }}"
+    __standalone_package_installer_paths: >-
+      {{ query('ansible.builtin.fileglob', *(standalone_package_installer_files | map('expanduser') | list)) | unique | list }}
+
+- name: Check they are packages for this host
+  ansible.builtin.assert:
+    that:
+      - __standalone_package_installer_paths | reject('search', '\.' ~ __standalone_package_installer_type ~ '$') | list | length == 0
+    fail_msg: >-
+      {{ inventory_hostname }} ({{ ansible_facts['distribution'] }}) installs .{{ __standalone_package_installer_type }}
+      files, but was given
+      {{ __standalone_package_installer_paths | reject('search', '\.' ~ __standalone_package_installer_type ~ '$') | map('basename') | join(', ') }}.
+    quiet: true
+
+- name: Check the checksums on the control node
+  delegate_to: localhost
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    checksum_algorithm: sha256
+  register: __standalone_package_installer_sums
+  loop: "{{ __standalone_package_installer_paths }}"
+  when: >-
+    standalone_package_installer_require_checksums | bool
+    or (item | basename) in standalone_package_installer_checksums
+
+- name: Check every checksum matches
+  ansible.builtin.assert:
+    that:
+      - (item.item | basename) in standalone_package_installer_checksums
+      - item.stat.checksum == standalone_package_installer_checksums[item.item | basename] | lower
+    fail_msg: >-
+      {{ item.item | basename }}:
+      {{ ('SHA-256 ' ~ item.stat.checksum ~ ' does not match ' ~ standalone_package_installer_checksums[item.item | basename])
+         if (item.item | basename) in standalone_package_installer_checksums
+         else 'no entry in standalone_package_installer_checksums, which standalone_package_installer_require_checksums requires' }}.
+    quiet: true
+  loop: "{{ __standalone_package_installer_sums.results | rejectattr('skipped', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.item | basename }}"
+
+# So nothing is pushed again when every package is installed already: the name and version
+# inside each file, read on the control node (files/package_info.py), against what the host has.
+# Where a file cannot be read, its conventional file name stands in, and a file with neither is
+# always pushed, leaving the package manager to decide.
+- name: Read each file's package name and version on the control node
+  delegate_to: localhost
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  ansible.builtin.command:
+    argv: "{{ [ansible_playbook_python, role_path ~ '/files/package_info.py'] + __standalone_package_installer_paths }}"
+  register: __standalone_package_installer_info
+  changed_when: false
+  check_mode: false
+
+- name: Note each package's name and version
+  ansible.builtin.set_fact:
+    __standalone_package_installer_expected: >-
+      {{ __standalone_package_installer_expected
+         + [{'path': item.path, 'file': item.path | basename,
+             'name': item.name or (__match[0] if __match else ''),
+             'version': item.version or ((__match[1] | urldecode) if __match else '')}] }}
+  vars:
+    __match: >-
+      {{ item.path | basename | regex_search(__standalone_package_installer_rpm_name if __standalone_package_installer_type == 'rpm'
+                                             else __standalone_package_installer_deb_name, '\g<name>', '\g<version>') }}
+  loop: "{{ __standalone_package_installer_info.stdout | from_json }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+
+- name: Read the installed versions (RPM)
+  ansible.builtin.command:
+    argv: [rpm, -q, --queryformat, "%{VERSION}-%{RELEASE}\n", "{{ item.name }}"]
+  register: __standalone_package_installer_installed_rpm
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  loop: "{{ __standalone_package_installer_expected | selectattr('name') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: __standalone_package_installer_type == 'rpm'
+
+- name: Read the installed versions (DEB)
+  ansible.builtin.command:
+    argv: [dpkg-query, --show, "--showformat=${Version} ${db:Status-Status}\n", "{{ item.name }}"]
+  register: __standalone_package_installer_installed_deb
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  loop: "{{ __standalone_package_installer_expected | selectattr('name') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: __standalone_package_installer_type == 'deb'
+
+- name: Work out which packages are missing or at another version
+  ansible.builtin.set_fact:
+    __standalone_package_installer_missing: >-
+      {{ __standalone_package_installer_missing
+         + ([] if item.name and __result.rc | default(1) == 0
+                  and (item.version ~ ('' if __standalone_package_installer_type == 'rpm' else ' installed'))
+                      in __result.stdout_lines | default([])
+               else [item.file]) }}
+  vars:
+    __result: >-
+      {{ ((__standalone_package_installer_installed_rpm if __standalone_package_installer_type == 'rpm'
+           else __standalone_package_installer_installed_deb).results | default([])
+          | selectattr('item.path', 'eq', item.path) | list + [{}]) | first }}
+  loop: "{{ __standalone_package_installer_expected }}"
+  loop_control:
+    label: "{{ item.file }}"
+
+- name: Push and install the packages
+  when: __standalone_package_installer_missing | length > 0
+  vars:
+    __standalone_package_installer_remote: >-
+      {{ __standalone_package_installer_paths | map('basename')
+         | map('regex_replace', '^', standalone_package_installer_remote_dir ~ '/') | list }}
+  block:
+    - name: Create the directory for the files on the host
+      ansible.builtin.file:
+        path: "{{ standalone_package_installer_remote_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Copy the package files to the host
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ standalone_package_installer_remote_dir }}/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0600"
+      loop: "{{ __standalone_package_installer_paths }}"
+
+    - name: Add the signing keys to the RPM database
+      when:
+        - __standalone_package_installer_type == 'rpm'
+        - standalone_package_installer_gpg_keys | length > 0
+      block:
+        - name: Copy the signing keys to the host
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "{{ standalone_package_installer_remote_dir }}/{{ item | basename }}.key"
+            owner: root
+            group: root
+            mode: "0600"
+          loop: "{{ standalone_package_installer_gpg_keys | map('expanduser') | list }}"
+
+        - name: Import them
+          ansible.builtin.rpm_key:
+            key: "{{ standalone_package_installer_remote_dir }}/{{ item | basename }}.key"
+            state: present
+          loop: "{{ standalone_package_installer_gpg_keys | map('expanduser') | list }}"
+
+    - name: Install the packages (dnf)
+      ansible.builtin.dnf:
+        name: "{{ __standalone_package_installer_remote }}"
+        state: present
+        disable_gpg_check: "{{ not standalone_package_installer_verify_signatures | bool }}"
+        disablerepo: "{{ omit if standalone_package_installer_use_repos | bool else '*' }}"
+        allow_downgrade: "{{ standalone_package_installer_allow_downgrade | bool }}"
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Install the packages (zypper)
+      community.general.zypper:
+        name: "{{ __standalone_package_installer_remote }}"
+        state: present
+        disable_gpg_check: "{{ not standalone_package_installer_verify_signatures | bool }}"
+        oldpackage: "{{ standalone_package_installer_allow_downgrade | bool }}"
+        extra_args_precommand: "{{ omit if standalone_package_installer_use_repos | bool else '--no-refresh' }}"
+      when: ansible_facts['os_family'] == 'Suse'
+
+    - name: Refresh the package lists
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when:
+        - ansible_facts['os_family'] == 'Debian'
+        - standalone_package_installer_use_repos | bool
+
+    # apt-get, not the apt module: it installs several files at once, so files that depend on
+    # each other install together, and it fetches what else they need from the repositories.
+    - name: Install the packages (apt)
+      ansible.builtin.command:
+        argv: >-
+          {{ (['apt-get', 'install', '-y', '--no-install-recommends']
+              + (['--allow-downgrades'] if standalone_package_installer_allow_downgrade | bool else [])
+              if standalone_package_installer_use_repos | bool else ['dpkg', '--install'])
+             + __standalone_package_installer_remote }}
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      register: __standalone_package_installer_apt
+      changed_when: true
+      when: ansible_facts['os_family'] == 'Debian'
+
+  always:
+    - name: Delete the files from the host
+      ansible.builtin.file:
+        path: "{{ standalone_package_installer_remote_dir }}"
+        state: absent
+      when: standalone_package_installer_cleanup | bool
+
+- name: Record what the files hold
+  ansible.builtin.set_fact:
+    standalone_package_installer_result:
+      files: "{{ __standalone_package_installer_expected | map(attribute='file') | list }}"
+      packages: "{{ __standalone_package_installer_expected | selectattr('name') | items2dict(key_name='name', value_name='version') }}"
+      pushed: "{{ __standalone_package_installer_missing | length > 0 }}"

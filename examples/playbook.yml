@@ -1,0 +1,13 @@
+---
+# Push package files from the control node and install them, then let the software's own role
+# take over. Run with: ansible-playbook -i inventory.ini examples/playbook.yml
+- name: Install package files brought in from outside
+  hosts: rhel9
+  become: true
+  roles:
+    - role: libre_devops.standalone_package_installer
+      vars:
+        standalone_package_installer_files:
+          - "{{ playbook_dir }}/files/rhel9/*.rpm"
+        standalone_package_installer_gpg_keys:
+          - "{{ playbook_dir }}/files/keys/microsoft.asc"

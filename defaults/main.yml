@@ -1,0 +1,35 @@
+---
+# A quick way to install package files you already have, for debugging, testing or a one-off:
+# the control node pushes them to each host and the host's own package manager installs them.
+# For anything you keep, use the software's own role or a repository instead.
+
+# The package files on the control node: paths or globs, such as files/mdatp/*.rpm. RPMs for
+# Red Hat and SUSE family hosts, DEBs for Debian family hosts, so give each group of hosts its
+# own list, for example in group_vars. Include the dependencies the hosts lack.
+standalone_package_installer_files: []
+
+# Let the package manager fetch missing dependencies from the host's own repositories (the
+# distribution's, Satellite or a mirror). false installs from the files alone, for hosts with no
+# repositories, so the list must then be complete.
+standalone_package_installer_use_repos: true
+
+# RPMs: check each package's signature against the keys in the host's RPM database, after adding
+# the key files below from the control node (such as Microsoft's). DEB files carry no signature
+# of their own, so check them with standalone_package_installer_checksums instead.
+standalone_package_installer_verify_signatures: true
+standalone_package_installer_gpg_keys: []
+
+# SHA-256 checksums by file name, checked on the control node before anything is pushed:
+#   standalone_package_installer_checksums:
+#     mdatp_101.25092.0005_amd64.deb: 0123...cdef
+standalone_package_installer_checksums: {}
+
+# Refuse any file without an entry in standalone_package_installer_checksums.
+standalone_package_installer_require_checksums: false
+
+# Allow a file to replace a newer installed version.
+standalone_package_installer_allow_downgrade: false
+
+# Where the files wait on the host while they are installed, and whether to delete them after.
+standalone_package_installer_remote_dir: /var/tmp/standalone-package-installer
+standalone_package_installer_cleanup: true

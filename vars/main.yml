@@ -1,0 +1,14 @@
+---
+# Internal values. Not meant to be overridden.
+
+# The package type each family installs.
+__standalone_package_installer_types:
+  RedHat: rpm
+  Suse: rpm
+  Debian: deb
+
+# Package name and version from the conventional file names, for files files/package_info.py
+# cannot read: name-version-release.arch.rpm and name_version_arch.deb (with an epoch's colon
+# written %3a, as apt names its downloads).
+__standalone_package_installer_rpm_name: '^(?P<name>.+)-(?P<version>[^-]+-[^-]+)\.[^.]+\.rpm$'
+__standalone_package_installer_deb_name: '^(?P<name>[^_]+)_(?P<version>[^_]+)_[^_.]+\.deb$'
