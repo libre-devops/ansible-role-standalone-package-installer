@@ -4,8 +4,11 @@ Notable changes to this role. The format follows [Keep a Changelog](https://keep
 
 ## Unreleased
 
+## 1.0.0 - 2026-11-12
+
 ### Added
 
+- First release.
 - Pushes RPM or DEB files from the control node and installs them with the host's package manager (`dnf`, `zypper`, `apt-get` or `dpkg`), with or without the host's repositories for dependencies.
 - RPM signature checks against the host's RPM database, after importing key files from the control node, and SHA-256 checks on the control node.
 - Reads each package's name and version inside the file on the control node (`files/package_info.py`), so nothing is pushed when every package is installed already, whatever the files are called.
