@@ -13,7 +13,7 @@ Pushes `.rpm` or `.deb` files you already have from the control node to each hos
 
 [![CI](https://github.com/libre-devops/ansible-role-standalone-package-installer/actions/workflows/ci.yml/badge.svg)](https://github.com/libre-devops/ansible-role-standalone-package-installer/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/libre-devops/ansible-role-standalone-package-installer?sort=semver&label=release)](https://github.com/libre-devops/ansible-role-standalone-package-installer/releases/latest)
-[![Galaxy](https://img.shields.io/badge/galaxy-libre__devops.standalone__package__installer-EE0000?logo=ansible&logoColor=white)](https://galaxy.ansible.com/ui/standalone/roles/libre_devops/standalone_package_installer/)
+[![Galaxy](https://img.shields.io/badge/galaxy-libre__devops.standalone__package__installer-EE0000?logo=ansible&logoColor=white)](https://galaxy.ansible.com/ui/standalone/roles/libre_devops/standalone_package_installer/documentation/)
 [![Licence](https://img.shields.io/github/license/libre-devops/ansible-role-standalone-package-installer)](./LICENSE)
 
 ---
