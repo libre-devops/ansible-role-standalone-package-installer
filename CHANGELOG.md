@@ -4,6 +4,8 @@ Notable changes to this role. The format follows [Keep a Changelog](https://keep
 
 ## Unreleased
 
+## 1.1.0 - 2026-11-16
+
 ### Added
 
 - RHEL 7: packages install with `yum`, run as a command, because ansible-core 2.17 removed the `yum` module and RHEL 7 has no `dnf`. Signatures are still checked (`localpkg_gpgcheck`, against the imported keys): a file whose key is missing fails the run. Downgrades are refused on RHEL 7, where yum cannot downgrade from a file. Tested in CI on UBI 7.
