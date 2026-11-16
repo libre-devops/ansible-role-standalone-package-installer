@@ -17,6 +17,17 @@
       SUSE families and DEBs on the Debian family.
     quiet: true
 
+# yum cannot downgrade from a local file the way dnf does, so say so rather than do nothing.
+- name: Check a downgrade is not asked for on RHEL 7
+  ansible.builtin.assert:
+    that:
+      - not standalone_package_installer_allow_downgrade | bool
+    fail_msg: >-
+      {{ inventory_hostname }} is RHEL 7, where the role installs with yum, which cannot downgrade from a
+      package file. Remove the newer version first, or set standalone_package_installer_allow_downgrade to false.
+    quiet: true
+  when: __standalone_package_installer_el7 | bool
+
 - name: Check each file or pattern matches a file on the control node
   ansible.builtin.assert:
     that:
@@ -194,7 +205,22 @@
         disable_gpg_check: "{{ not standalone_package_installer_verify_signatures | bool }}"
         disablerepo: "{{ omit if standalone_package_installer_use_repos | bool else '*' }}"
         allow_downgrade: "{{ standalone_package_installer_allow_downgrade | bool }}"
-      when: ansible_facts['os_family'] == 'RedHat'
+      when:
+        - ansible_facts['os_family'] == 'RedHat'
+        - not __standalone_package_installer_el7 | bool
+
+    # RHEL 7 has yum and no dnf, and ansible-core 2.17 removed the yum module (yum is redirected
+    # to dnf), so yum runs as a command. yum does not check a local file's signature unless told
+    # to: localpkg_gpgcheck makes it, against the keys imported above, as dnf does.
+    - name: Install the packages (yum, RHEL 7)  # noqa: command-instead-of-module
+      ansible.builtin.command:
+        argv: >-
+          {{ ['yum', '-y', '--setopt=localpkg_gpgcheck=' ~ (1 if standalone_package_installer_verify_signatures | bool else 0)]
+             + ([] if standalone_package_installer_use_repos | bool else ['--disablerepo=*'])
+             + ['localinstall'] + __standalone_package_installer_remote }}
+      register: __standalone_package_installer_yum
+      changed_when: true
+      when: __standalone_package_installer_el7 | bool
 
     - name: Install the packages (zypper)
       community.general.zypper:

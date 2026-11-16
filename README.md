@@ -45,16 +45,17 @@ It is for debugging, testing and one-offs. For anything you keep, give the hosts
 | What | Detail |
 |---|---|
 | Control node | `ansible-core` 2.16 or later. `community.general` for SUSE hosts only (`community.general.zypper`). |
-| Managed nodes | A Python your `ansible-core` supports. RHEL 8 and SLES 15 ship Python 3.6, which ansible-core 2.17 and later cannot use: run [libre_devops.python](https://github.com/libre-devops/ansible-role-python) first, which can itself install Python from pushed packages. |
+| Managed nodes | A Python your `ansible-core` supports. RHEL 7 ships Python 2.7, and RHEL 8 and SLES 15 Python 3.6, which ansible-core 2.17 and later cannot use: run [libre_devops.python](https://github.com/libre-devops/ansible-role-python) first, which can itself install Python from pushed packages (on RHEL 7, from a pushed python-build-standalone archive). |
 | Files | Packages built for the hosts' distribution and release, with the dependencies the hosts cannot get from their repositories. |
 | Privileges | `become: true`. |
 
 ## Supported platforms
 
-Each platform below runs in CI on every pull request: it downloads `jq` and its dependencies from its own repositories, then the role pushes and installs them with the repositories switched off.
+Each platform below runs in CI on every pull request: it downloads `jq` (on RHEL 7, `rsync`: its UBI repositories have no `jq`) and its dependencies from its own repositories, then the role pushes and installs them with the repositories switched off.
 
 | Distribution | Package type | Installed with |
 |---|---|---|
+| RHEL 7 (UBI) | `.rpm` | `yum`, run as a command (ansible-core 2.17 removed the `yum` module, and RHEL 7 has no `dnf`), with `localpkg_gpgcheck` so signatures are checked. No downgrades: yum cannot downgrade from a file. |
 | RHEL 8 and 9 (UBI), Rocky 10 | `.rpm` | `dnf`, signatures checked |
 | SLES 15 SP7 and 16 | `.rpm` | `community.general.zypper`, signatures checked |
 | Debian 12 and 13, Ubuntu 24.04 and 26.04 | `.deb` | `apt-get` (or `dpkg` without repositories), checksums checked |

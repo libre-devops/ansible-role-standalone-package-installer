@@ -12,3 +12,7 @@ __standalone_package_installer_types:
 # written %3a, as apt names its downloads).
 __standalone_package_installer_rpm_name: '^(?P<name>.+)-(?P<version>[^-]+-[^-]+)\.[^.]+\.rpm$'
 __standalone_package_installer_deb_name: '^(?P<name>[^_]+)_(?P<version>[^_]+)_[^_.]+\.deb$'
+
+# RHEL 7 (and its rebuilds) install with yum, run as a command: see tasks/install.yml.
+__standalone_package_installer_el7: >-
+  {{ ansible_facts['os_family'] == 'RedHat' and ansible_facts['distribution_major_version'] | default('') == '7' }}

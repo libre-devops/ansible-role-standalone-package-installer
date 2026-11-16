@@ -4,9 +4,9 @@
   become: true
   gather_facts: false
   tasks:
-    - name: Run jq
+    - name: Run the test package
       ansible.builtin.command:
-        argv: [jq, --null-input, --compact-output, "{installed: true}"]
+        argv: "{{ __test_command | default(['jq', '--null-input', '--compact-output', '{installed: true}']) }}"
       register: __verify_jq
       changed_when: false
 
@@ -15,9 +15,9 @@
         path: /var/tmp/standalone-package-installer
       register: __verify_dir
 
-    - name: Check jq works and the files are gone
+    - name: Check the test package works and the files are gone
       ansible.builtin.assert:
         that:
-          - __verify_jq.stdout == '{"installed":true}'
+          - __test_output | default('{"installed":true}') in __verify_jq.stdout
           - not __verify_dir.stat.exists
         quiet: true

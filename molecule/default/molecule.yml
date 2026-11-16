@@ -1,5 +1,5 @@
 ---
-# Each platform downloads jq and everything it needs from its own repositories in prepare, as
+# Each platform downloads jq (rsync on RHEL 7) and everything it needs from its own repositories in prepare, as
 # someone would bring package files in, and the files go to the control node with the
 # distribution's signing keys. Then the role pushes and installs them with the repositories
 # switched off, checking RPM signatures (after importing the keys) and DEB checksums, and a

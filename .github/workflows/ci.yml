@@ -79,6 +79,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { scenario: default, platform: rhel7 }
           - { scenario: default, platform: rhel8 }
           - { scenario: default, platform: rhel9 }
           - { scenario: default, platform: rocky10 }

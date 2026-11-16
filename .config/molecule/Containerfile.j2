@@ -3,7 +3,19 @@
 # account check fails in the UBI images, so the test images skip it (Defaults !pam_acct_mgmt).
 FROM {{ item.image }}
 
-{% if 'ubi' in item.image %}
+{% if 'ubi7' in item.image %}
+# RHEL 7 has only Python 2.7: give it what libre_devops.python would, a python-build-standalone
+# build (they need glibc 2.17, which RHEL 7 has), checked against its published checksum.
+RUN yum -y install sudo \
+    && yum clean all \
+    && echo 'Defaults !pam_acct_mgmt' > /etc/sudoers.d/molecule \
+    && chmod 0440 /etc/sudoers.d/molecule \
+    && curl -fsSL -o /tmp/python.tar.gz 'https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.12.16%2B20261026-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz' \
+    && echo 'ce4f6d0a6cfdb3bed6e44c2f9affd85943c76a42e25ad3a259002f31d6fb8a20  /tmp/python.tar.gz' | sha256sum -c - \
+    && mkdir -p /opt/python/bootstrap \
+    && tar -xzf /tmp/python.tar.gz -C /opt/python/bootstrap --strip-components=1 \
+    && rm /tmp/python.tar.gz
+{% elif 'ubi' in item.image %}
 RUN dnf -y install sudo{{ ' python3.12' if 'ubi8' in item.image else '' }} \
     && dnf clean all \
     && echo 'Defaults !pam_acct_mgmt' > /etc/sudoers.d/molecule \

@@ -7,6 +7,10 @@ driver:
   name: podman
 
 platforms:
+  - name: spi-rhel7
+    image: registry.access.redhat.com/ubi7/ubi:latest
+    dockerfile: ../../.config/molecule/Containerfile.j2
+    command: sleep infinity
   - name: spi-rhel8
     image: registry.access.redhat.com/ubi8/ubi:latest
     dockerfile: ../../.config/molecule/Containerfile.j2
@@ -52,7 +56,13 @@ provisioner:
       interpreter_python: auto_silent
   inventory:
     host_vars:
-      # RHEL 8 and SLES 15 ship Python 3.6, which ansible-core no longer supports on targets.
+      # RHEL 7 ships Python 2.7, and RHEL 8 and SLES 15 Python 3.6, which ansible-core no longer
+      # supports on targets. RHEL 7's test package is rsync: its UBI repositories have no jq.
+      spi-rhel7:
+        ansible_python_interpreter: /opt/python/bootstrap/bin/python3
+        __test_package: rsync
+        __test_command: [rsync, --version]
+        __test_output: rsync  version
       spi-rhel8:
         ansible_python_interpreter: /usr/bin/python3.12
       spi-sles15:

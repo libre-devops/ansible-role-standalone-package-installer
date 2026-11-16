@@ -6,16 +6,17 @@
   vars:
     __prepare_dir: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}"
   tasks:
-    - name: Download jq and what it needs, without installing them  # noqa: command-instead-of-module
+    - name: Download the test package and what it needs, without installing them  # noqa: command-instead-of-module
       ansible.builtin.shell: |
         set -e
         rm -rf /tmp/spi-pkgs && mkdir -p /tmp/spi-pkgs
         case "{{ ansible_facts['os_family'] }}" in
-          RedHat) dnf install -y --downloadonly --downloaddir=/tmp/spi-pkgs jq ;;
-          Debian) apt-get update && apt-get install -y --download-only --no-install-recommends jq \
+          RedHat) {{ 'yum' if ansible_facts['distribution_major_version'] == '7' else 'dnf' }} install -y --downloadonly \
+                    --downloaddir=/tmp/spi-pkgs {{ __test_package | default('jq') }} ;;
+          Debian) apt-get update && apt-get install -y --download-only --no-install-recommends {{ __test_package | default('jq') }} \
                     && cp /var/cache/apt/archives/*.deb /tmp/spi-pkgs/ && apt-get clean ;;
           # A glob, not find: the SLES 16 image has no findutils.
-          Suse) zypper --non-interactive --pkg-cache-dir /tmp/spi-cache install --download-only jq
+          Suse) zypper --non-interactive --pkg-cache-dir /tmp/spi-cache install --download-only {{ __test_package | default('jq') }}
                 cp /tmp/spi-cache/*/*/*.rpm /tmp/spi-pkgs/ && rm -rf /tmp/spi-cache ;;
         esac
         ls /tmp/spi-pkgs/* >/dev/null
@@ -25,8 +26,9 @@
       register: __prepare_download
       changed_when: true
 
-    - name: Check jq is not installed yet
-      ansible.builtin.command: jq --version
+    - name: Check the test package is not installed yet
+      ansible.builtin.command:
+        argv: "{{ __test_command | default(['jq', '--version']) }}"
       register: __prepare_jq
       changed_when: false
       failed_when: __prepare_jq.rc == 0
